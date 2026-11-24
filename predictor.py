@@ -1,0 +1,238 @@
+"""Data loading, feature engineering and model training for the Nifty 50
+next-day closing price predictor. Kept free of Streamlit so it can be tested
+on its own."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from sklearn.linear_model import Ridge
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+OHLCV = ["Open", "High", "Low", "Close", "Volume"]
+
+MODELS = {
+    "Ridge regression": lambda: make_pipeline(StandardScaler(), Ridge(alpha=1.0)),
+    "Random forest": lambda: RandomForestRegressor(
+        n_estimators=300, max_depth=6, min_samples_leaf=5, n_jobs=-1, random_state=42
+    ),
+    "Gradient boosting": lambda: GradientBoostingRegressor(
+        n_estimators=300, max_depth=3, learning_rate=0.03, subsample=0.8, random_state=42
+    ),
+}
+
+
+# --------------------------------------------------------------------------
+# Data
+# --------------------------------------------------------------------------
+def fetch_yahoo(ticker: str = "^NSEI", period: str = "10y") -> pd.DataFrame:
+    """Daily OHLCV from Yahoo Finance, indexed by date."""
+    import yfinance as yf
+
+    df = yf.Ticker(ticker).history(period=period, interval="1d", auto_adjust=False)
+    return _clean(df)
+
+
+def fetch_intraday(ticker: str = "^NSEI") -> pd.DataFrame:
+    """Today's (or the last session's) 5-minute bars, for the live quote."""
+    import yfinance as yf
+
+    df = yf.Ticker(ticker).history(period="5d", interval="5m", auto_adjust=False)
+    if df.empty:
+        return df
+    last_day = df.index[-1].date()
+    return df[df.index.date == last_day][OHLCV]
+
+
+def load_csv(path_or_buffer) -> pd.DataFrame:
+    """Read a CSV in either Yahoo format (Date,Open,High,Low,Close,Volume) or
+    Investing.com format (Date,Price,Open,High,Low,Vol.,Change %)."""
+    raw = pd.read_csv(path_or_buffer)
+    raw.columns = [c.strip() for c in raw.columns]
+    if "Price" in raw.columns and "Close" not in raw.columns:
+        raw = raw.rename(columns={"Price": "Close"})
+    if "Vol." in raw.columns:
+        raw["Volume"] = raw["Vol."].map(_parse_volume)
+    raw["Date"] = pd.to_datetime(raw["Date"], errors="coerce")
+    raw = raw.set_index("Date")
+    for col in ["Open", "High", "Low", "Close"]:
+        raw[col] = pd.to_numeric(raw[col].astype(str).str.replace(",", ""), errors="coerce")
+    if "Volume" not in raw.columns:
+        raw["Volume"] = np.nan
+    return _clean(raw)
+
+
+def _parse_volume(v) -> float:
+    if pd.isna(v):
+        return np.nan
+    s = str(v).replace(",", "").strip()
+    mult = {"K": 1e3, "M": 1e6, "B": 1e9}.get(s[-1:].upper(), 1)
+    try:
+        return float(s.rstrip("KMBkmb")) * mult
+    except ValueError:
+        return np.nan
+
+
+def _clean(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    df = df.copy()
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    df.index = pd.to_datetime(df.index)
+    if df.index.tz is not None:
+        df.index = df.index.tz_localize(None)
+    df.index = df.index.normalize()
+    df.index.name = "Date"
+    df = df[OHLCV].sort_index()
+    df = df[~df.index.duplicated(keep="last")]
+    return df.dropna(subset=["Open", "High", "Low", "Close"])
+
+
+# --------------------------------------------------------------------------
+# Features
+# --------------------------------------------------------------------------
+def build_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Features use only information available at that day's close.
+    Target is the next day's log return; the price is rebuilt from it."""
+    out = pd.DataFrame(index=df.index)
+    close = df["Close"]
+    ret = np.log(close).diff()
+
+    for lag in range(1, 6):
+        out[f"ret_lag{lag}"] = ret.shift(lag - 1)
+    for w in (5, 10, 20, 50):
+        out[f"close_vs_ma{w}"] = close / close.rolling(w).mean() - 1
+    out["vol_5"] = ret.rolling(5).std()
+    out["vol_20"] = ret.rolling(20).std()
+    out["range_pct"] = (df["High"] - df["Low"]) / close
+    out["body_pct"] = (close - df["Open"]) / df["Open"]
+    out["rsi_14"] = _rsi(close, 14) / 100
+    vol = df["Volume"].replace(0, np.nan)
+    if vol.notna().mean() > 0.8:
+        out["volume_z20"] = (vol - vol.rolling(20).mean()) / vol.rolling(20).std()
+    out["dow"] = df.index.dayofweek
+
+    out["target"] = ret.shift(-1)
+    out["Close"] = close
+    return out
+
+
+def _rsi(close: pd.Series, n: int) -> pd.Series:
+    delta = close.diff()
+    gain = delta.clip(lower=0).ewm(alpha=1 / n, adjust=False).mean()
+    loss = (-delta.clip(upper=0)).ewm(alpha=1 / n, adjust=False).mean()
+    rs = gain / loss.replace(0, np.nan)
+    return 100 - 100 / (1 + rs)
+
+
+def feature_columns(feats: pd.DataFrame) -> list[str]:
+    return [c for c in feats.columns if c not in ("target", "Close")]
+
+
+# --------------------------------------------------------------------------
+# Training / evaluation
+# --------------------------------------------------------------------------
+@dataclass
+class Result:
+    backtest: pd.DataFrame  # Date, Actual, Predicted, Naive, PrevClose
+    metrics: dict
+    next_date: pd.Timestamp
+    next_close: float
+    last_close: float
+    last_date: pd.Timestamp
+    feature_importance: pd.Series | None
+
+
+def run(df: pd.DataFrame, model_name: str, test_days: int) -> Result:
+    feats = build_features(df)
+    cols = feature_columns(feats)
+    feats = feats.replace([np.inf, -np.inf], np.nan)
+
+    labelled = feats.dropna(subset=cols + ["target"])
+    if len(labelled) < test_days + 200:
+        raise ValueError(
+            f"Need at least {test_days + 200} usable days of history, got {len(labelled)}."
+        )
+
+    # Walk-forward in monthly-ish blocks: each block is predicted by a model
+    # trained only on data before it, so the backtest never sees the future.
+    test = labelled.iloc[-test_days:]
+    block = 21
+    preds = []
+    for start in range(0, len(test), block):
+        chunk = test.iloc[start : start + block]
+        train = labelled.loc[: chunk.index[0]].iloc[:-1]
+        model = MODELS[model_name]()
+        model.fit(train[cols], train["target"])
+        preds.append(pd.Series(model.predict(chunk[cols]), index=chunk.index))
+    pred_ret = pd.concat(preds)
+
+    prev_close = test["Close"]
+    next_dates = _shifted_index(feats, test.index)
+    actual = prev_close * np.exp(test["target"])
+    predicted = prev_close * np.exp(pred_ret)
+
+    backtest = pd.DataFrame(
+        {
+            "Date": next_dates,
+            "PrevClose": prev_close.values,
+            "Actual": actual.values,
+            "Predicted": predicted.values,
+            "Naive": prev_close.values,
+        }
+    )
+
+    err = backtest["Predicted"] - backtest["Actual"]
+    naive_err = backtest["Naive"] - backtest["Actual"]
+    true_dir = np.sign(backtest["Actual"] - backtest["PrevClose"])
+    pred_dir = np.sign(backtest["Predicted"] - backtest["PrevClose"])
+    metrics = {
+        "MAE": float(err.abs().mean()),
+        "RMSE": float(np.sqrt((err**2).mean())),
+        "MAPE": float((err.abs() / backtest["Actual"]).mean() * 100),
+        "Naive MAE": float(naive_err.abs().mean()),
+        "Direction accuracy": float((true_dir == pred_dir).mean() * 100),
+        "Up-day share": float((true_dir > 0).mean() * 100),
+    }
+
+    # Final model on all labelled history, predicting the day after the last close.
+    final = MODELS[model_name]()
+    final.fit(labelled[cols], labelled["target"])
+    last = feats.dropna(subset=cols).iloc[[-1]]
+    next_ret = float(final.predict(last[cols])[0])
+    last_close = float(last["Close"].iloc[0])
+    last_date = last.index[0]
+
+    importance = None
+    if hasattr(final, "feature_importances_"):
+        importance = pd.Series(final.feature_importances_, index=cols).sort_values()
+    elif hasattr(final, "named_steps"):
+        coef = final.named_steps["ridge"].coef_
+        importance = pd.Series(np.abs(coef), index=cols).sort_values()
+
+    return Result(
+        backtest=backtest,
+        metrics=metrics,
+        next_date=next_business_day(last_date),
+        next_close=last_close * np.exp(next_ret),
+        last_close=last_close,
+        last_date=last_date,
+        feature_importance=importance,
+    )
+
+
+def _shifted_index(feats: pd.DataFrame, idx: pd.Index) -> list[pd.Timestamp]:
+    """Date of the trading day after each date in idx."""
+    all_idx = feats.index
+    pos = all_idx.get_indexer(idx)
+    return [all_idx[p + 1] if p + 1 < len(all_idx) else next_business_day(all_idx[p]) for p in pos]
+
+
+def next_business_day(d: pd.Timestamp) -> pd.Timestamp:
+    """Next weekday. NSE holidays are not modelled."""
+    return (pd.Timestamp(d) + pd.offsets.BDay(1)).normalize()
