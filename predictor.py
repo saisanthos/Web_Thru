@@ -37,6 +37,18 @@ def fetch_yahoo(ticker: str = "^NSEI", period: str = "10y") -> pd.DataFrame:
     return _clean(df)
 
 
+def fetch_us_closed(ticker: str = "^GSPC", period: str = "10y") -> pd.DataFrame:
+    """Daily bars for a US index, without today's bar while the US session is
+    still open (a half-finished day isn't what the model was trained on)."""
+    df = fetch_yahoo(ticker, period)
+    if df.empty:
+        return df
+    now_ny = pd.Timestamp.now(tz="America/New_York")
+    if df.index[-1] == now_ny.normalize().tz_localize(None) and now_ny.hour * 60 + now_ny.minute < 16 * 60 + 15:
+        df = df.iloc[:-1]
+    return df
+
+
 def fetch_intraday(ticker: str = "^NSEI") -> pd.DataFrame:
     """Today's (or the last session's) 5-minute bars, for the live quote."""
     import yfinance as yf
@@ -96,9 +108,12 @@ def _clean(df: pd.DataFrame) -> pd.DataFrame:
 # --------------------------------------------------------------------------
 # Features
 # --------------------------------------------------------------------------
-def build_features(df: pd.DataFrame) -> pd.DataFrame:
+def build_features(df: pd.DataFrame, extra: dict | None = None) -> pd.DataFrame:
     """Features use only information available at that day's close.
-    Target is the next day's log return; the price is rebuilt from it."""
+    Target is the next day's log return; the price is rebuilt from it.
+
+    extra maps a short name to another market's daily OHLCV. Each one adds its
+    latest 1-day and 5-day returns as of that date (see _extra_features)."""
     out = pd.DataFrame(index=df.index)
     close = df["Close"]
     ret = np.log(close).diff()
@@ -117,9 +132,27 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
         out["volume_z20"] = (vol - vol.rolling(20).mean()) / vol.rolling(20).std()
     out["dow"] = df.index.dayofweek
 
+    for name, other in (extra or {}).items():
+        out = out.join(_extra_features(name, other, df.index))
+
     out["target"] = ret.shift(-1)
     out["Close"] = close
     return out
+
+
+def _extra_features(name: str, other: pd.DataFrame, index: pd.DatetimeIndex) -> pd.DataFrame:
+    """Returns of another market, aligned to each Nifty date by taking that
+    market's last close on or before the same calendar date. US markets close
+    after NSE, so the US close dated t is known before NSE opens on t+1."""
+    c = other["Close"].dropna()
+    r = np.log(c).diff()
+    f = pd.DataFrame({f"{name}_ret1": r, f"{name}_ret5": np.log(c).diff(5)})
+    aligned = f.reindex(f.index.union(index)).ffill().reindex(index)
+    # Don't carry a stale value across a long gap (e.g. data that ends early).
+    last_seen = pd.Series(c.index, index=c.index).reindex(c.index.union(index)).ffill().reindex(index)
+    stale = (index.to_series() - last_seen).dt.days > 5
+    aligned[stale.values] = np.nan
+    return aligned
 
 
 def _rsi(close: pd.Series, n: int) -> pd.Series:
@@ -148,8 +181,8 @@ class Result:
     feature_importance: pd.Series | None
 
 
-def run(df: pd.DataFrame, model_name: str, test_days: int) -> Result:
-    feats = build_features(df)
+def run(df: pd.DataFrame, model_name: str, test_days: int, extra: dict | None = None) -> Result:
+    feats = build_features(df, extra)
     cols = feature_columns(feats)
     feats = feats.replace([np.inf, -np.inf], np.nan)
 
