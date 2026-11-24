@@ -217,6 +217,7 @@ def run(df: pd.DataFrame, model_name: str, test_days: int, extra: dict | None = 
             "Actual": actual.values,
             "Predicted": predicted.values,
             "Naive": prev_close.values,
+            "Open": df["Open"].reindex(next_dates).values,
         }
     )
 
@@ -269,3 +270,73 @@ def _shifted_index(feats: pd.DataFrame, idx: pd.Index) -> list[pd.Timestamp]:
 def next_business_day(d: pd.Timestamp) -> pd.Timestamp:
     """Next weekday. NSE holidays are not modelled."""
     return (pd.Timestamp(d) + pd.offsets.BDay(1)).normalize()
+
+
+# --------------------------------------------------------------------------
+# Strategy backtest
+# --------------------------------------------------------------------------
+def strategy(
+    bt: pd.DataFrame,
+    mode: str = "long_flat",
+    entry: str = "close",
+    threshold_pct: float = 0.0,
+    cost_pct: float = 0.03,
+) -> tuple[pd.DataFrame, dict]:
+    """Trade the backtest's predictions one day at a time.
+
+    mode: "long_flat" (long on predicted up days, else cash) or
+          "long_short" (long on predicted up days, short on predicted down days).
+    entry: "close" trades from the previous close to the next close, which is only
+           possible when every feature is known at NSE's close (no S&P 500).
+           "open" enters at the next open and exits at that day's close, and
+           compares the prediction with the open price.
+    threshold_pct: skip days where the predicted move is smaller than this.
+    cost_pct: cost per buy or sell, as % of the position (brokerage, taxes, slippage).
+    """
+    d = bt.set_index("Date")
+    if entry == "open":
+        start = d["Open"]
+    else:
+        start = d["PrevClose"]
+    day_ret = np.log(d["Actual"] / start)
+    pred_move = d["Predicted"] / start - 1
+
+    pos = np.sign(pred_move).where(pred_move.abs() * 100 >= threshold_pct, 0.0)
+    if mode == "long_flat":
+        pos = pos.clip(lower=0)
+    pos = pos.fillna(0.0)
+
+    if entry == "open":
+        # Every trading day is a round trip: in at the open, out at the close.
+        trades = pos.abs() * 2
+    else:
+        trades = pos.diff().abs().fillna(pos.abs())
+    strat = pos * day_ret - trades * cost_pct / 100
+    hold = np.log(d["Actual"] / d["PrevClose"])
+
+    out = pd.DataFrame(
+        {
+            "Position": pos,
+            "Strategy": np.exp(strat.cumsum()),
+            "Buy & hold": np.exp(hold.cumsum()),
+        }
+    )
+    stats = {"Strategy": _perf(strat, pos, trades), "Buy & hold": _perf(hold, pd.Series(1.0, index=hold.index), None)}
+    return out, stats
+
+
+def _perf(r: pd.Series, pos: pd.Series, trades: pd.Series | None) -> dict:
+    r = r.fillna(0.0)
+    equity = np.exp(r.cumsum())
+    years = len(r) / 252
+    vol = r.std() * np.sqrt(252)
+    active = r[pos != 0]
+    return {
+        "Total return %": (equity.iloc[-1] - 1) * 100,
+        "Return per year %": (equity.iloc[-1] ** (1 / years) - 1) * 100 if years else np.nan,
+        "Sharpe": r.mean() * 252 / vol if vol else np.nan,
+        "Worst drop %": ((equity / equity.cummax()) - 1).min() * 100,
+        "Winning days %": (active > 0).mean() * 100 if len(active) else np.nan,
+        "Days in market %": (pos != 0).mean() * 100,
+        "Trades": int(trades.sum()) if trades is not None else 1,
+    }

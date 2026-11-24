@@ -56,4 +56,30 @@ Direction accuracy rose from 51–56% to 56–61% with the S&P 500 features. Add
 Nifty Bank didn't help in any test, so it isn't used. India VIX, Nikkei and USD/INR
 haven't been tested yet because they need live data to evaluate.
 
+## Trading strategy
+
+The dashboard also backtests trading the predictions one day at a time against
+buying and holding, with adjustable costs. Choose long-or-cash or long-or-short, and
+optionally skip days with a small predicted move.
+
+The S&P 500 signal can only be acted on at the next morning's open, because the US
+closes after NSE. Much of the US move is already priced into Nifty's opening gap, so
+that version has done poorly. The Nifty-only model can be traded at the close.
+
+With 10 years of training data, 0.03% cost per side, 500-day tests:
+
+| Test period ending | Long or cash | Long or short | Buy & hold |
+|---|---|---|---|
+| Nov 2011 | 9.4%/yr | 18.0%/yr | 1.4%/yr |
+| Nov 2013 | 16.5% | 23.6% | 9.8% |
+| Nov 2015 | 6.1% | 1.4% | 11.0% |
+| Nov 2017 | 8.5% | 3.9% | 13.3% |
+| Nov 2019 | 13.2% | 20.0% | 6.7% |
+| Nov 2021 | 29.1% | 26.9% | 31.3% |
+| Apr 2023 | 18.0% | 29.5% | 7.4% |
+| Apr 2025 | 23.3% | 34.6% | 13.0% |
+
+Training on all 25 years instead made the strategy worse than buy and hold, and at
+0.1% cost per side most of the edge disappears, so treat these numbers with caution.
+
 Educational use only, not investment advice.
