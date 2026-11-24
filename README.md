@@ -32,9 +32,28 @@ Gradient boosting), backtest window, and an optional CSV upload.
   levels they never saw in training.
 - The backtest retrains every 21 trading days using only past data, so it never sees
   the answer.
+- The model also uses the **S&P 500's** latest 1-day and 5-day returns (toggle in the
+  sidebar). The US market closes after NSE, so that move is already known before Nifty
+  opens the next day. Today's S&P bar is ignored while the US session is still open.
 - The **naive** baseline (tomorrow closes where today did) is shown next to the model's
   error, because it's hard to beat on daily index data.
 - If Yahoo Finance can't be reached, the app falls back to `data/nifty50_history.csv`
   (Nifty 50 from 2000 to Apr 2025) and says so.
+
+## Backtest results
+
+500-day walk-forward backtests, mean absolute error of the next-day close.
+"vs naive" compares with guessing that tomorrow closes where today did.
+
+| Test period ending | Model | Nifty only | + S&P 500 |
+|---|---|---|---|
+| Nov 2019 | Random forest | 0.2% better than naive | 2.5% better |
+| Nov 2019 | Gradient boosting | 0.1% better | 2.8% better |
+| Nov 2015 | Random forest | 0.2% worse | 4.1% better |
+| Nov 2015 | Gradient boosting | 0.4% worse | 4.0% better |
+
+Direction accuracy rose from 51–56% to 56–61% with the S&P 500 features. Adding
+Nifty Bank didn't help in any test, so it isn't used. India VIX, Nikkei and USD/INR
+haven't been tested yet because they need live data to evaluate.
 
 Educational use only, not investment advice.
