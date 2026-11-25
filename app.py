@@ -90,6 +90,8 @@ else:
             f"historical CSV instead. Predictions won't be current. ({fetch_error})"
         )
         df = p.load_csv(FALLBACK_CSV)
+        if period != "max":
+            df = df.loc[df.index[-1] - pd.DateOffset(years=int(period[:-1])) :]
         source = "Bundled CSV (offline fallback)"
         use_spx = False  # no matching S&P 500 history offline
 
@@ -262,6 +264,74 @@ with right:
 # --------------------------------------------------------------------------
 # Details
 # --------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# Trading strategy
+# --------------------------------------------------------------------------
+st.subheader("Trading strategy backtest")
+st.caption(
+    "Trades the predictions above one day at a time and compares the result with "
+    "simply holding Nifty. Past results don't guarantee future returns."
+)
+
+s1, s2, s3, s4 = st.columns(4)
+signal_choice = s1.selectbox(
+    "Signal",
+    ["Nifty-only model, trade at close", "With S&P 500, trade at next open"],
+    help="The S&P 500 closes after NSE, so a model that uses it can only be acted on "
+    "at the next morning's open. The Nifty-only model is known at NSE's close, so you "
+    "can trade at the close.",
+    disabled=spx is None,
+)
+mode_label = s2.selectbox("Positions", ["Long or cash", "Long or short"])
+threshold = s3.number_input(
+    "Min. predicted move (%)", 0.0, 2.0, 0.0, step=0.05,
+    help="Stay in cash on days where the predicted move is smaller than this.",
+)
+cost = s4.number_input(
+    "Cost per buy or sell (%)", 0.0, 0.5, 0.03, step=0.01, format="%.2f",
+    help="Brokerage, taxes and slippage per side. About 0.03% is typical for "
+    "Nifty futures; delivery trades in an index fund cost more.",
+)
+
+if spx is not None and signal_choice.startswith("With S&P"):
+    strat_bt, entry = bt, "open"
+elif spx is None:
+    strat_bt, entry = bt, "close"
+else:
+    strat_bt, entry = get_result(df, model_name, test_days, None).backtest, "close"
+
+mode = "long_flat" if mode_label == "Long or cash" else "long_short"
+curve, perf = p.strategy(strat_bt, mode, entry, threshold, cost)
+
+fig_eq = go.Figure()
+fig_eq.add_trace(
+    go.Scatter(x=curve.index, y=curve["Buy & hold"], name="Buy & hold", mode="lines",
+               line=dict(color=ACTUAL, width=2), hovertemplate="₹%{y:.3f}")
+)
+fig_eq.add_trace(
+    go.Scatter(x=curve.index, y=curve["Strategy"], name="Strategy", mode="lines",
+               line=dict(color=PREDICTED, width=2), hovertemplate="₹%{y:.3f}")
+)
+fig_eq.update_layout(
+    height=380, hovermode="x unified", margin=dict(l=0, r=0, t=10, b=0),
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+    yaxis=dict(title="Value of ₹1 invested", tickformat=".2f"),
+)
+st.plotly_chart(fig_eq, width="stretch")
+
+perf_df = pd.DataFrame(perf)
+st.dataframe(
+    perf_df.style.format("{:,.1f}", na_rep="–").format("{:,.2f}", subset=pd.IndexSlice[["Sharpe"], :])
+    .format("{:,.0f}", subset=pd.IndexSlice[["Trades"], :]),
+    width="stretch",
+)
+if entry == "open":
+    st.caption(
+        "Enters at each day's open and exits at its close. Much of the S&P 500's move "
+        "is usually priced into Nifty's opening gap, so this signal tends to do poorly."
+    )
+
+
 with st.expander("Backtest table"):
     table = bt[["Date", "Actual", "Predicted"]].copy()
     table["Error"] = table["Predicted"] - table["Actual"]
