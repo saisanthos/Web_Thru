@@ -1,0 +1,18 @@
+<nav class="wt-nav" aria-label="Markets">
+  <a class="wt-brand" href="/markets/">WebThru Markets</a>
+  <a class="wt-link {{ON_HOME}}" href="/markets/">Overview</a>
+  <a class="wt-link {{ON_INDIA}}" href="/markets/india/">India</a>
+  <a class="wt-link {{ON_USA}}" href="/markets/usa/">USA</a>
+  <form class="wt-search" id="wt-search" role="search">
+    <label for="wt-market" class="wt-hide">Market</label>
+    <select id="wt-market">
+      <option value="IN">India (BSE)</option>
+      <option value="US">USA</option>
+      <option value="ANY">Other</option>
+    </select>
+    <label for="wt-q" class="wt-hide">Symbol</label>
+    <input id="wt-q" type="search" placeholder="Symbol, e.g. RELIANCE or AAPL" autocomplete="off" spellcheck="false">
+    <button type="submit">Search</button>
+  </form>
+</nav>
+<div class="wt-tape" id="wt-tape"></div>

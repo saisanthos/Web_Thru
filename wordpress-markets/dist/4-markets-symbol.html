@@ -1,0 +1,360 @@
+<!-- WebThru Markets: Symbol details. Paste into an Elementor HTML widget on the page at /markets/symbol/ -->
+<style>
+.wt-mkt{--wt-accent:#2962ff;--wt-ink:#131722;--wt-muted:#5d606b;--wt-line:#e0e3eb;--wt-soft:#f5f7fb;max-width:1240px;margin:0 auto;padding:0 16px 32px;color:var(--wt-ink);font-family:inherit;font-size:16px;line-height:1.5}
+.wt-mkt *{box-sizing:border-box;min-width:0}
+.wt-mkt a{color:var(--wt-accent)}
+.wt-nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px 22px;padding:14px 0 10px;border-bottom:1px solid var(--wt-line)}
+.wt-nav .wt-brand{font-weight:700;font-size:18px;color:var(--wt-ink);text-decoration:none;margin-right:6px}
+.wt-nav .wt-link{color:var(--wt-ink);text-decoration:none;font-weight:600;padding:8px 0;border-bottom:2px solid transparent}
+.wt-nav .wt-link.on,.wt-nav .wt-link:hover{color:var(--wt-accent);border-bottom-color:var(--wt-accent)}
+.wt-search{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.wt-search select,.wt-search input{height:44px;border:1px solid var(--wt-line);border-radius:6px;padding:0 10px;font:inherit;font-size:16px;background:#fff;color:var(--wt-ink)}
+.wt-search input{width:240px;max-width:100%}
+.wt-search button{height:44px;padding:0 18px;border:0;border-radius:6px;background:var(--wt-accent);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+.wt-search select:focus,.wt-search input:focus,.wt-search button:focus{outline:2px solid var(--wt-accent);outline-offset:2px}
+.wt-tape{margin:8px 0 4px;min-height:46px}
+.wt-mkt h1{font-size:30px;line-height:1.15;margin:22px 0 4px}
+.wt-mkt h2{font-size:19px;line-height:1.25;margin:0 0 10px}
+.wt-lede{color:var(--wt-muted);margin:0 0 18px}
+.wt-sec{margin:26px 0}
+.wt-grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr))}
+.wt-card{border:1px solid var(--wt-line);border-radius:8px;padding:14px;background:#fff}
+.wt-tabs{display:flex;flex-wrap:wrap;gap:6px 18px;padding:10px 0;border-bottom:1px solid var(--wt-line);margin:8px 0 4px;position:sticky;top:0;background:#fff;z-index:2}
+.wt-tabs a{text-decoration:none;font-weight:600;color:var(--wt-ink);padding:6px 0}
+.wt-tabs a:hover{color:var(--wt-accent)}
+.wt-chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}
+.wt-chips a{display:inline-block;padding:6px 12px;border:1px solid var(--wt-line);border-radius:999px;text-decoration:none;color:var(--wt-ink);font-size:14px;background:var(--wt-soft)}
+.wt-chips a:hover{border-color:var(--wt-accent);color:var(--wt-accent)}
+.wt-chips span{font-size:13px;color:var(--wt-muted);align-self:center;margin-right:2px}
+.wt-note{font-size:13px;color:var(--wt-muted);margin:8px 0 0}
+.wt-banner{background:var(--wt-soft);border:1px solid var(--wt-line);border-radius:8px;padding:10px 14px;font-size:14px;margin:12px 0}
+.wt-foot{border-top:1px solid var(--wt-line);margin-top:30px;padding-top:14px;font-size:13px;color:var(--wt-muted)}
+.wt-hide{display:none!important}
+@media (max-width:700px){.wt-search{margin-left:0;width:100%}.wt-search input{flex:1}.wt-mkt h1{font-size:25px}}
+</style>
+<div class="wt-mkt">
+<nav class="wt-nav" aria-label="Markets">
+  <a class="wt-brand" href="/markets/">WebThru Markets</a>
+  <a class="wt-link " href="/markets/">Overview</a>
+  <a class="wt-link " href="/markets/india/">India</a>
+  <a class="wt-link " href="/markets/usa/">USA</a>
+  <form class="wt-search" id="wt-search" role="search">
+    <label for="wt-market" class="wt-hide">Market</label>
+    <select id="wt-market">
+      <option value="IN">India (BSE)</option>
+      <option value="US">USA</option>
+      <option value="ANY">Other</option>
+    </select>
+    <label for="wt-q" class="wt-hide">Symbol</label>
+    <input id="wt-q" type="search" placeholder="Symbol, e.g. RELIANCE or AAPL" autocomplete="off" spellcheck="false">
+    <button type="submit">Search</button>
+  </form>
+</nav>
+<div class="wt-tape" id="wt-tape"></div>
+<p class="wt-note" id="wt-crumb" style="margin-top:16px"></p>
+<h1 class="wt-hide" id="wt-title">Symbol</h1>
+<div id="wt-info" class="wt-sec" style="margin-top:6px"></div>
+<div id="wt-banners"></div>
+
+<nav class="wt-tabs" aria-label="Sections">
+  <a href="#wt-chart">Chart</a>
+  <a href="#wt-tech">Technical</a>
+  <a href="#wt-company" data-sec="wt-company">Company</a>
+  <a href="#wt-news" data-sec="wt-news">News</a>
+</nav>
+
+<section class="wt-sec" id="wt-chart"><h2>Chart</h2><div id="wt-chart-w"></div></section>
+
+<section class="wt-card wt-sec" id="wt-tech">
+  <h2>Technical analysis</h2>
+  <div id="wt-tech-w"></div>
+  <p class="wt-note">Ratings come from moving averages and oscillators. They describe the chart, not a recommendation.</p>
+</section>
+
+<div class="wt-grid wt-sec" id="wt-company">
+  <section class="wt-card"><h2>Company profile</h2><div id="wt-profile"></div></section>
+  <section class="wt-card"><h2>Financials</h2><div id="wt-fin"></div></section>
+</div>
+
+<section class="wt-card wt-sec" id="wt-news"><h2>News</h2><div id="wt-news-w"></div></section>
+
+<section class="wt-sec">
+  <h2>Popular symbols</h2>
+  <div class="wt-chips" id="wt-chips"></div>
+</section>
+<footer class="wt-foot">
+  <p>Charts and market data by <a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank">TradingView</a>.
+  Indian prices come from BSE and update at the end of each trading day. US stock prices are delayed. US index prices are FOREX.com CFD quotes that track the S&amp;P 500, Nasdaq 100 and Dow Jones.</p>
+  <p>This page is for information only and is not investment advice.</p>
+</footer>
+</div>
+<script>
+(function () {
+  // ---- Settings you may want to change ----
+  // Address of the symbol detail page. Every widget sends clicks here.
+  var SITE = /^https?:$/.test(location.protocol) ? location.origin : 'https://webthruservices.com';
+  var SYMBOL_PAGE = SITE + '/markets/symbol/';
+  var THEME = 'light';   // 'light' or 'dark'
+  var LOCALE = 'en';
+  // -----------------------------------------
+
+  var SYMBOL_RE = /^([A-Z0-9_]{1,20}:)?[A-Z0-9_.!&\-]{1,30}$/;
+
+  function mount(id, file, cfg, height) {
+    var host = document.getElementById(id);
+    if (!host) return;
+    host.innerHTML = '';
+    // TradingView resets its own container to 100% height, so the fixed height goes on the outer box.
+    if (height) host.style.height = height + 'px';
+    var box = document.createElement('div');
+    box.className = 'tradingview-widget-container';
+    box.style.height = '100%';
+    var inner = document.createElement('div');
+    inner.className = 'tradingview-widget-container__widget';
+    inner.style.height = '100%';
+    box.appendChild(inner);
+    var s = document.createElement('script');
+    s.src = 'https://s3.tradingview.com/external-embedding/embed-widget-' + file + '.js';
+    s.async = true;
+    var base = { locale: LOCALE, colorTheme: THEME, isTransparent: true };
+    for (var k in cfg) base[k] = cfg[k];
+    s.text = JSON.stringify(base);
+    box.appendChild(s);
+    host.appendChild(box);
+  }
+
+  function symbolUrl(sym) {
+    return SYMBOL_PAGE + '?tvwidgetsymbol=' + encodeURIComponent(sym);
+  }
+
+  function tape(list) {
+    mount('wt-tape', 'ticker-tape', {
+      symbols: list.map(function (x) { return { proName: x[0], title: x[1] }; }),
+      showSymbolLogo: true,
+      displayMode: 'adaptive',
+      largeChartUrl: SYMBOL_PAGE
+    });
+  }
+
+  function overview(id, tabs, height) {
+    mount(id, 'market-overview', {
+      dateRange: '12M',
+      showChart: true,
+      showSymbolLogo: true,
+      showFloatingTooltip: false,
+      width: '100%',
+      height: '100%',
+      largeChartUrl: SYMBOL_PAGE,
+      tabs: tabs.map(function (t) {
+        return {
+          title: t[0],
+          originalTitle: t[0],
+          symbols: t[1].map(function (x) { return { s: x[0], d: x[1] }; })
+        };
+      })
+    }, height || 480);
+  }
+
+  function heatmap(id, dataSource, height) {
+    mount(id, 'stock-heatmap', {
+      dataSource: dataSource,
+      exchanges: [],
+      grouping: 'sector',
+      blockSize: 'market_cap_basic',
+      blockColor: 'change',
+      hasTopBar: false,
+      isDataSetEnabled: false,
+      isZoomEnabled: true,
+      hasSymbolTooltip: true,
+      isMonoSize: false,
+      width: '100%',
+      height: '100%',
+      symbolUrl: SYMBOL_PAGE
+    }, height || 520);
+  }
+
+  function movers(id, exchange, height) {
+    mount(id, 'hotlists', {
+      exchange: exchange,
+      dateRange: '12M',
+      showChart: true,
+      showSymbolLogo: true,
+      showFloatingTooltip: false,
+      width: '100%',
+      height: '100%',
+      largeChartUrl: SYMBOL_PAGE
+    }, height || 480);
+  }
+
+  function screener(id, market, height) {
+    mount(id, 'screener', {
+      market: market,
+      defaultColumn: 'overview',
+      defaultScreen: 'most_capitalized',
+      showToolbar: true,
+      width: '100%',
+      height: '100%',
+      largeChartUrl: SYMBOL_PAGE
+    }, height || 520);
+  }
+
+  function calendar(id, countries, height) {
+    mount(id, 'events', {
+      importanceFilter: '0,1',
+      countryFilter: countries,
+      width: '100%',
+      height: '100%'
+    }, height || 480);
+  }
+
+  function news(id, cfg, height) {
+    var c = { displayMode: 'regular', width: '100%', height: '100%' };
+    for (var k in cfg) c[k] = cfg[k];
+    mount(id, 'timeline', c, height || 480);
+  }
+
+  function chartOverview(id, list, height) {
+    mount(id, 'symbol-overview', {
+      symbols: list.map(function (x) { return [x[1], x[0] + '|12M']; }),
+      chartOnly: false,
+      width: '100%',
+      height: '100%',
+      showVolume: false,
+      showMA: false,
+      hideDateRanges: false,
+      hideMarketStatus: false,
+      hideSymbolLogo: false,
+      scalePosition: 'right',
+      scaleMode: 'Normal',
+      noTimeScale: false,
+      valuesTracking: '1',
+      changeMode: 'price-and-percent',
+      chartType: 'area',
+      lineWidth: 2,
+      dateRanges: ['1m|1D', '3m|1D', '12m|1D', '60m|1W', 'all|1M']
+    }, height || 440);
+  }
+
+  // Search box in the menu bar
+  var form = document.getElementById('wt-search');
+  if (form) {
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var q = document.getElementById('wt-q');
+      var v = q.value.trim().toUpperCase().replace(/\s+/g, '');
+      if (!v) { q.focus(); return; }
+      var market = document.getElementById('wt-market').value;
+      if (v.indexOf(':') === -1 && market === 'IN') v = 'BSE:' + v;
+      if (!SYMBOL_RE.test(v)) { q.value = ''; q.placeholder = 'Letters and numbers only'; q.focus(); return; }
+      location.href = symbolUrl(v);
+    });
+  }
+
+  var DEFAULT_SYMBOL = 'FOREXCOM:SPXUSD';
+  var NON_EQUITY = ['FOREXCOM', 'OANDA', 'FX', 'FX_IDC', 'BINANCE', 'COINBASE', 'CAPITALCOM',
+    'BITSTAMP', 'KRAKEN', 'TVC', 'INDEX', 'CRYPTO'];
+
+  var params = new URLSearchParams(location.search);
+  var raw = (params.get('tvwidgetsymbol') || params.get('symbol') || '').trim().toUpperCase();
+  var sym = SYMBOL_RE.test(raw) ? raw : DEFAULT_SYMBOL;
+  var notes = [];
+
+  if (sym.indexOf('NSE:') === 0) {
+    sym = 'BSE:' + sym.slice(4);
+    notes.push('NSE prices are not available in these free widgets, so this page shows the same company on BSE.');
+  }
+  var exch = sym.indexOf(':') > -1 ? sym.split(':')[0] : '';
+  var ticker = sym.split(':').pop();
+  var isIndia = exch === 'BSE';
+  var isEquity = NON_EQUITY.indexOf(exch) === -1 && !(isIndia && /^(SENSEX|BSE)/.test(ticker));
+
+  if (isIndia) {
+    notes.push('Indian prices come from BSE and update at the end of each trading day, so use the daily (1 day) view for the chart and technical ratings.');
+    document.getElementById('wt-market').value = 'IN';
+  } else {
+    document.getElementById('wt-market').value = 'US';
+  }
+
+  var NAMES = {
+    'FOREXCOM:SPXUSD': 'S&P 500', 'FOREXCOM:NSXUSD': 'Nasdaq 100', 'FOREXCOM:DJI': 'Dow Jones',
+    'BSE:SENSEX': 'Sensex', 'FX_IDC:USDINR': 'USD/INR', 'OANDA:XAUUSD': 'Gold', 'BINANCE:BTCUSDT': 'Bitcoin'
+  };
+  var name = NAMES[sym] || ticker;
+  document.title = name + ' price, chart and technical analysis';
+  document.getElementById('wt-title').textContent = name + ' price, chart and technical analysis';
+  document.getElementById('wt-crumb').textContent = 'Markets / ' + (exch ? exch + ' / ' : '') + ticker;
+
+  var banners = document.getElementById('wt-banners');
+  notes.forEach(function (n) {
+    var p = document.createElement('p');
+    p.className = 'wt-banner';
+    p.textContent = n;
+    banners.appendChild(p);
+  });
+
+  function hideSection(id) {
+    document.getElementById(id).classList.add('wt-hide');
+    var tab = document.querySelector('.wt-tabs a[data-sec="' + id + '"]');
+    if (tab) tab.classList.add('wt-hide');
+  }
+
+  tape([
+    ['BSE:SENSEX', 'Sensex'], ['FOREXCOM:SPXUSD', 'S&P 500'], ['FOREXCOM:NSXUSD', 'Nasdaq 100'],
+    ['FOREXCOM:DJI', 'Dow Jones'], ['FX_IDC:USDINR', 'USD/INR'], ['OANDA:XAUUSD', 'Gold'], ['BINANCE:BTCUSDT', 'Bitcoin']
+  ]);
+  mount('wt-info', 'symbol-info', { symbol: sym, width: '100%' });
+  mount('wt-chart-w', 'advanced-chart', {
+    symbol: sym,
+    autosize: true,
+    interval: 'D',
+    timezone: 'exchange',
+    theme: THEME,
+    style: '1',
+    allow_symbol_change: false,
+    calendar: false,
+    withdateranges: true,
+    hide_side_toolbar: false,
+    details: false,
+    support_host: 'https://www.tradingview.com'
+  }, 560);
+  mount('wt-tech-w', 'technical-analysis', {
+    symbol: sym,
+    interval: '1D',
+    showIntervalTabs: true,
+    displayMode: 'multiple',
+    width: '100%',
+    height: '100%'
+  }, 480);
+
+  if (isEquity) {
+    mount('wt-profile', 'symbol-profile', { symbol: sym, width: '100%', height: '100%' }, 420);
+    mount('wt-fin', 'financials', { symbol: sym, displayMode: 'regular', width: '100%', height: '100%' }, 420);
+  } else {
+    hideSection('wt-company');
+  }
+
+  if (!isIndia) {
+    news('wt-news-w', { feedMode: 'symbol', symbol: sym }, 460);
+  } else {
+    hideSection('wt-news');
+  }
+
+  var chips = [
+    ['India', [['BSE:SENSEX', 'Sensex'], ['BSE:RELIANCE', 'Reliance'], ['BSE:TCS', 'TCS'], ['BSE:HDFCBANK', 'HDFC Bank'], ['BSE:INFY', 'Infosys']]],
+    ['USA', [['FOREXCOM:SPXUSD', 'S&P 500'], ['NASDAQ:AAPL', 'Apple'], ['NASDAQ:NVDA', 'Nvidia'], ['NASDAQ:MSFT', 'Microsoft'], ['NASDAQ:TSLA', 'Tesla']]],
+    ['Other', [['BINANCE:BTCUSDT', 'Bitcoin'], ['OANDA:XAUUSD', 'Gold'], ['FX_IDC:USDINR', 'USD/INR']]]
+  ];
+  var box = document.getElementById('wt-chips');
+  chips.forEach(function (group) {
+    var label = document.createElement('span');
+    label.textContent = group[0] + ':';
+    box.appendChild(label);
+    group[1].forEach(function (c) {
+      var a = document.createElement('a');
+      a.href = symbolUrl(c[0]);
+      a.textContent = c[1];
+      box.appendChild(a);
+    });
+  });
+})();
+</script>
